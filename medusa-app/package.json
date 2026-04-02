@@ -1,0 +1,29 @@
+{
+  "name": "medusa-store",
+  "version": "1.0.0",
+  "description": "MedusaJS v2 store for Kubernetes Store Platform",
+  "private": true,
+  "scripts": {
+    "build": "medusa build",
+    "start": "medusa start",
+    "dev": "medusa develop",
+    "predeploy": "medusa db:migrate",
+    "db:migrate": "medusa db:migrate"
+  },
+  "dependencies": {
+    "@medusajs/framework": "2.13.1",
+    "@medusajs/medusa": "2.13.1",
+    "@medusajs/cli": "2.13.1",
+    "@medusajs/caching-redis": "2.13.1",
+    "@medusajs/event-bus-redis": "2.13.1",
+    "@medusajs/workflow-engine-redis": "2.13.1",
+    "@medusajs/admin-sdk": "2.13.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "ts-node": "^10.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
