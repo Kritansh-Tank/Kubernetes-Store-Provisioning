@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.storeName }}-postgres
+  labels:
+    app: {{ .Values.storeName }}-postgres
+    store-id: {{ .Values.storeId }}
+type: Opaque
+stringData:
+  POSTGRES_USER: {{ .Values.postgres.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.postgres.password | quote }}
+  POSTGRES_DB: {{ .Values.postgres.database | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.storeName }}-postgres-data
+  labels:
+    app: {{ .Values.storeName }}-postgres
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.storeName }}-postgres
+  labels:
+    app: {{ .Values.storeName }}-postgres
+    store-id: {{ .Values.storeId }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.storeName }}-postgres
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.storeName }}-postgres
+        store-id: {{ .Values.storeId }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: {{ .Values.storeName }}-postgres
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: {{ .Values.postgres.resources.requests.cpu }}
+              memory: {{ .Values.postgres.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.postgres.resources.limits.cpu }}
+              memory: {{ .Values.postgres.resources.limits.memory }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.user }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.user }}"]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.storeName }}-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.storeName }}-postgres
+  labels:
+    app: {{ .Values.storeName }}-postgres
+spec:
+  selector:
+    app: {{ .Values.storeName }}-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

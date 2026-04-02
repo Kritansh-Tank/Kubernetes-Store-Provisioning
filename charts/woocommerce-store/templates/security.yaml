@@ -1,0 +1,92 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Values.storeName }}-quota
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.maxCpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.maxMemory }}
+    limits.cpu: {{ .Values.resourceQuota.maxCpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.maxMemory }}
+    persistentvolumeclaims: "5"
+    requests.storage: {{ .Values.resourceQuota.maxPvcStorage }}
+{{- end }}
+---
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ .Values.storeName }}-limits
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.limitRange.defaultCpu }}
+        memory: {{ .Values.limitRange.defaultMemory }}
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: {{ .Values.limitRange.maxCpu | quote }}
+        memory: {{ .Values.limitRange.maxMemory }}
+{{- end }}
+---
+{{- if .Values.networkPolicy.enabled }}
+# Deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-default-deny
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Allow ingress to WordPress from Ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-allow-ingress-to-wp
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.storeName }}-wordpress
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 80
+---
+# Allow WordPress -> MariaDB
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-allow-wp-to-db
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.storeName }}-mariadb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .Values.storeName }}-wordpress
+        - podSelector:
+            matchLabels:
+              app: {{ .Values.storeName }}-woo-setup
+      ports:
+        - port: 3306
+{{- end }}

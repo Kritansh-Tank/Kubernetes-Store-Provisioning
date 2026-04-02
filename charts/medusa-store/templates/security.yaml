@@ -1,0 +1,106 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ .Values.storeName }}-quota
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.maxCpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.maxMemory }}
+    limits.cpu: {{ .Values.resourceQuota.maxCpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.maxMemory }}
+    persistentvolumeclaims: "5"
+    requests.storage: {{ .Values.resourceQuota.maxPvcStorage }}
+{{- end }}
+---
+{{- if .Values.limitRange.enabled }}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ .Values.storeName }}-limits
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.limitRange.defaultCpu }}
+        memory: {{ .Values.limitRange.defaultMemory }}
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: {{ .Values.limitRange.maxCpu | quote }}
+        memory: {{ .Values.limitRange.maxMemory }}
+{{- end }}
+---
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-default-deny
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-allow-ingress-to-medusa
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.storeName }}-medusa
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-allow-medusa-to-postgres
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.storeName }}-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .Values.storeName }}-medusa
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.storeName }}-allow-medusa-to-redis
+  labels:
+    store-id: {{ .Values.storeId }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Values.storeName }}-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: {{ .Values.storeName }}-medusa
+      ports:
+        - port: 6379
+{{- end }}

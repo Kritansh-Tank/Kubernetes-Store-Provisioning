@@ -1,0 +1,41 @@
+# values-local.yaml
+# Overrides for local k3d development environment
+# Usage: helm upgrade --install store-platform charts/store-platform -f values-local.yaml
+
+api:
+  image: store-provisioning-api:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    DOMAIN_SUFFIX: local.store-platform.test
+    MAX_STORES: "20"
+    MAX_CONCURRENT_PROVISIONS: "5"
+    LOG_LEVEL: debug
+    HELM_TIMEOUT: "600s"
+    PROVISION_TIMEOUT_MS: "600000"
+
+dashboard:
+  image: store-provisioning-dashboard:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: platform.local.store-platform.test
+  annotations: {}
+  tls: []

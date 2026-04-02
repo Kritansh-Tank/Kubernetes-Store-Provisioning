@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DOMAIN_SUFFIX=local.store-platform.test
+      - MAX_STORES=20
+      - MAX_CONCURRENT_PROVISIONS=5
+      - LOG_LEVEL=info
+    volumes:
+      - ~/.kube:/root/.kube:ro
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+    restart: unless-stopped

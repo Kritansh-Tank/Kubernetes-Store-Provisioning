@@ -1,0 +1,47 @@
+{{- if .Values.networkPolicy.enabled }}
+# Deny all ingress by default for platform namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-default-deny
+  labels:
+    app.kubernetes.io/name: store-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Allow ingress controller -> dashboard (port 3000)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-allow-ingress-to-dashboard
+  labels:
+    app.kubernetes.io/name: store-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: store-provisioning-dashboard
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: {{ .Values.dashboard.port }}
+---
+# Allow ingress controller -> API (port 3001)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-allow-ingress-to-api
+  labels:
+    app.kubernetes.io/name: store-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: store-provisioning-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: {{ .Values.api.port }}
+{{- end }}

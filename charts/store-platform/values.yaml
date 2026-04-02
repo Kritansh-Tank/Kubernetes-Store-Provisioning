@@ -1,0 +1,49 @@
+api:
+  image: store-provisioning-api:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    DOMAIN_SUFFIX: local.store-platform.test
+    MAX_STORES: "20"
+    MAX_CONCURRENT_PROVISIONS: "5"
+    LOG_LEVEL: info
+    HELM_TIMEOUT: "600s"
+    PROVISION_TIMEOUT_MS: "600000"
+
+dashboard:
+  image: store-provisioning-dashboard:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+serviceAccount:
+  create: true
+  name: store-provisioner
+
+rbac:
+  create: true
+
+ingress:
+  enabled: true
+  className: nginx
+  host: platform.local.store-platform.test
+  annotations: {}
+  tls: []
+
+networkPolicy:
+  enabled: false

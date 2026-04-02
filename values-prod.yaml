@@ -1,0 +1,49 @@
+# values-prod.yaml
+# Overrides for production deployment (k3s on VPS)
+# Usage: helm upgrade --install store-platform charts/store-platform -f values-prod.yaml
+
+api:
+  image: ghcr.io/your-org/store-provisioning-api:1.0.0  # Replace with your registry
+  imagePullPolicy: Always
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  env:
+    DOMAIN_SUFFIX: stores.yourdomain.com       # Replace with your domain
+    MAX_STORES: "50"
+    MAX_CONCURRENT_PROVISIONS: "3"
+    LOG_LEVEL: info
+    HELM_TIMEOUT: "600s"
+    PROVISION_TIMEOUT_MS: "600000"
+
+dashboard:
+  image: ghcr.io/your-org/store-provisioning-dashboard:1.0.0  # Replace with your registry
+  imagePullPolicy: Always
+  replicas: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: platform.yourdomain.com                # Replace with your domain
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls:
+      - secretName: platform-tls
+        hosts:
+          - platform.yourdomain.com
+
+networkPolicy:
+  enabled: true

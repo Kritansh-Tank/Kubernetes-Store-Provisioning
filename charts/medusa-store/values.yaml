@@ -1,0 +1,65 @@
+storeName: ""
+storeId: ""
+domain: ""
+
+medusa:
+  image: medusa-store:local
+  imagePullPolicy: Never
+  replicas: 1
+  workerMode: shared
+  jwtSecret: changeme
+  cookieSecret: changeme
+  adminEmail: admin@medusa-test.com
+  adminPassword: supersecret
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+
+postgres:
+  image: postgres:15-alpine
+  user: medusa
+  password: changeme
+  database: medusa
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+redis:
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+
+resourceQuota:
+  enabled: false
+  maxCpu: "2"
+  maxMemory: 2Gi
+  maxPvcStorage: 20Gi
+
+limitRange:
+  enabled: false
+  defaultCpu: 200m
+  defaultMemory: 256Mi
+  maxCpu: "1"
+  maxMemory: 1Gi
+
+networkPolicy:
+  enabled: false

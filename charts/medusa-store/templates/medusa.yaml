@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.storeName }}-medusa
+  labels:
+    app: {{ .Values.storeName }}-medusa
+    store-id: {{ .Values.storeId }}
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ .Values.storeName }}-postgres:5432/{{ .Values.postgres.database }}?sslmode=disable"
+  REDIS_URL: "redis://{{ .Values.storeName }}-redis:6379"
+  JWT_SECRET: {{ .Values.medusa.jwtSecret | quote }}
+  COOKIE_SECRET: {{ .Values.medusa.cookieSecret | quote }}
+  MEDUSA_WORKER_MODE: {{ .Values.medusa.workerMode | default "shared" | quote }}
+  STORE_CORS: "http://{{ .Values.domain }}"
+  ADMIN_CORS: "http://{{ .Values.domain }}"
+  AUTH_CORS: "http://{{ .Values.domain }}"
+  MEDUSA_BACKEND_URL: "http://{{ .Values.domain }}"
+  DISABLE_MEDUSA_ADMIN: "false"
+  NODE_ENV: "development"
+  MEDUSA_ADMIN_EMAIL: {{ .Values.medusa.adminEmail | quote }}
+  MEDUSA_ADMIN_PASSWORD: {{ .Values.medusa.adminPassword | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.storeName }}-medusa
+  labels:
+    app: {{ .Values.storeName }}-medusa
+    store-id: {{ .Values.storeId }}
+spec:
+  replicas: {{ .Values.medusa.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.storeName }}-medusa
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.storeName }}-medusa
+        store-id: {{ .Values.storeId }}
+    spec:
+      initContainers:
+        - name: wait-for-deps
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.storeName }}-postgres 5432; do echo waiting for postgres; sleep 2; done
+              until nc -z {{ .Values.storeName }}-redis 6379; do echo waiting for redis; sleep 2; done
+        - name: run-migrations
+          image: {{ .Values.medusa.image }}
+          {{- if .Values.medusa.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.medusa.imagePullPolicy }}
+          {{- end }}
+          command: ["sh", "-c", "npx medusa db:migrate --execute-safe-links"]
+          envFrom:
+            - secretRef:
+                name: {{ .Values.storeName }}-medusa
+        - name: create-admin
+          image: {{ .Values.medusa.image }}
+          {{- if .Values.medusa.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.medusa.imagePullPolicy }}
+          {{- end }}
+          command:
+            - sh
+            - -c
+            - |
+              npx medusa user -e "$MEDUSA_ADMIN_EMAIL" -p "$MEDUSA_ADMIN_PASSWORD" || true
+          envFrom:
+            - secretRef:
+                name: {{ .Values.storeName }}-medusa
+      containers:
+        - name: medusa
+          image: {{ .Values.medusa.image }}
+          {{- if .Values.medusa.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.medusa.imagePullPolicy }}
+          {{- end }}
+          ports:
+            - containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: {{ .Values.storeName }}-medusa
+          resources:
+            requests:
+              cpu: {{ .Values.medusa.resources.requests.cpu }}
+              memory: {{ .Values.medusa.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.medusa.resources.limits.cpu }}
+              memory: {{ .Values.medusa.resources.limits.memory }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.storeName }}-medusa
+  labels:
+    app: {{ .Values.storeName }}-medusa
+spec:
+  selector:
+    app: {{ .Values.storeName }}-medusa
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.storeName }}-medusa
+  labels:
+    app: {{ .Values.storeName }}-medusa
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.storeName }}-medusa
+                port:
+                  number: 9000
+{{- end }}

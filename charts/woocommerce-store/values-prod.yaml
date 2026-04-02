@@ -1,0 +1,40 @@
+# woocommerce-values-prod.yaml
+# Production overrides for per-store WooCommerce deployments
+# These are passed by the API provisioner via --set flags,
+# but this file documents the recommended production settings.
+
+resourceQuota:
+  enabled: true
+  maxCpu: "2"
+  maxMemory: 2Gi
+  maxPvcStorage: 20Gi
+
+limitRange:
+  enabled: true
+  defaultCpu: 200m
+  defaultMemory: 256Mi
+  maxCpu: "1"
+  maxMemory: 1Gi
+
+networkPolicy:
+  enabled: true
+
+wordpress:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  storage: 5Gi
+
+mariadb:
+  storage: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

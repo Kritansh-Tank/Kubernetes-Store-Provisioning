@@ -1,0 +1,60 @@
+storeName: ""
+storeId: ""
+domain: ""
+
+wordpress:
+  image: wordpress:6.7-apache
+  replicas: 1
+  adminUser: admin
+  adminPassword: changeme
+  adminEmail: admin@example.com
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage: 2Gi
+
+mariadb:
+  image: mariadb:10.11
+  rootPassword: changeme
+  user: wordpress
+  password: changeme
+  database: wordpress
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+woocommerce:
+  # WP-CLI image used for auto-setup job
+  cliImage: wordpress:cli-2.9-php8.2
+  # Seed sample products for end-to-end order testing
+  seedProducts: true
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+
+resourceQuota:
+  enabled: false
+  maxCpu: "2"
+  maxMemory: 2Gi
+  maxPvcStorage: 20Gi
+
+limitRange:
+  enabled: false
+  defaultCpu: 200m
+  defaultMemory: 256Mi
+  maxCpu: "1"
+  maxMemory: 1Gi
+
+networkPolicy:
+  enabled: false

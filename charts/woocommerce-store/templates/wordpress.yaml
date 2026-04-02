@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.storeName }}-wordpress
+  labels:
+    app: {{ .Values.storeName }}-wordpress
+    store-id: {{ .Values.storeId }}
+type: Opaque
+stringData:
+  WORDPRESS_DB_HOST: {{ .Values.storeName }}-mariadb
+  WORDPRESS_DB_USER: {{ .Values.mariadb.user | quote }}
+  WORDPRESS_DB_PASSWORD: {{ .Values.mariadb.password | quote }}
+  WORDPRESS_DB_NAME: {{ .Values.mariadb.database | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.storeName }}-wp-content
+  labels:
+    app: {{ .Values.storeName }}-wordpress
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.wordpress.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.storeName }}-wordpress
+  labels:
+    app: {{ .Values.storeName }}-wordpress
+    store-id: {{ .Values.storeId }}
+spec:
+  replicas: {{ .Values.wordpress.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.storeName }}-wordpress
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.storeName }}-wordpress
+        store-id: {{ .Values.storeId }}
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z {{ .Values.storeName }}-mariadb 3306; do echo waiting for db; sleep 2; done']
+      containers:
+        - name: wordpress
+          image: {{ .Values.wordpress.image }}
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: {{ .Values.storeName }}-wordpress
+          resources:
+            requests:
+              cpu: {{ .Values.wordpress.resources.requests.cpu }}
+              memory: {{ .Values.wordpress.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.wordpress.resources.limits.cpu }}
+              memory: {{ .Values.wordpress.resources.limits.memory }}
+          volumeMounts:
+            - name: wp-content
+              mountPath: /var/www/html/wp-content
+          readinessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /wp-login.php
+              port: 80
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+      volumes:
+        - name: wp-content
+          persistentVolumeClaim:
+            claimName: {{ .Values.storeName }}-wp-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.storeName }}-wordpress
+  labels:
+    app: {{ .Values.storeName }}-wordpress
+spec:
+  selector:
+    app: {{ .Values.storeName }}-wordpress
+  ports:
+    - port: 80
+      targetPort: 80
+---
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.storeName }}-wordpress
+  labels:
+    app: {{ .Values.storeName }}-wordpress
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.storeName }}-wordpress
+                port:
+                  number: 80
+{{- end }}

@@ -1,0 +1,26 @@
+# API Server Dockerfile
+# Multi-stage build: compile TypeScript, then run with Helm installed
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY api/package*.json ./
+RUN npm ci --production=false
+COPY api/ ./
+RUN npm run build
+
+FROM node:20-alpine
+RUN apk add --no-cache curl bash openssl
+# Install Helm 3
+RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Install kubectl for K8s API access
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./
+# Bundle Helm charts inside the image
+COPY charts/woocommerce-store /app/charts/woocommerce-store
+COPY charts/medusa-store /app/charts/medusa-store
+EXPOSE 3001
+CMD ["node", "dist/index.js"]

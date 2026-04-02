@@ -1,0 +1,185 @@
+# --- API Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-provisioning-api
+  labels:
+    app.kubernetes.io/name: store-provisioning-api
+    app.kubernetes.io/part-of: store-platform
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: store-provisioning-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: store-provisioning-api
+        app.kubernetes.io/part-of: store-platform
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        runAsNonRoot: false
+      containers:
+        - name: api
+          image: {{ .Values.api.image }}
+          imagePullPolicy: {{ .Values.api.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.api.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.api.port | quote }}
+            - name: DOMAIN_SUFFIX
+              value: {{ .Values.api.env.DOMAIN_SUFFIX | quote }}
+            - name: MAX_STORES
+              value: {{ .Values.api.env.MAX_STORES | quote }}
+            - name: MAX_CONCURRENT_PROVISIONS
+              value: {{ .Values.api.env.MAX_CONCURRENT_PROVISIONS | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.api.env.LOG_LEVEL | quote }}
+            - name: HELM_TIMEOUT
+              value: {{ .Values.api.env.HELM_TIMEOUT | quote }}
+            - name: PROVISION_TIMEOUT_MS
+              value: {{ .Values.api.env.PROVISION_TIMEOUT_MS | quote }}
+            - name: WOOCOMMERCE_CHART_PATH
+              value: /app/charts/woocommerce-store
+            - name: MEDUSA_CHART_PATH
+              value: /app/charts/medusa-store
+          resources:
+            requests:
+              cpu: {{ .Values.api.resources.requests.cpu }}
+              memory: {{ .Values.api.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.api.resources.limits.cpu }}
+              memory: {{ .Values.api.resources.limits.memory }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ .Values.api.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.api.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+# --- API Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-provisioning-api
+  labels:
+    app.kubernetes.io/name: store-provisioning-api
+spec:
+  selector:
+    app.kubernetes.io/name: store-provisioning-api
+  ports:
+    - port: {{ .Values.api.port }}
+      targetPort: {{ .Values.api.port }}
+      protocol: TCP
+---
+# --- Dashboard Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-provisioning-dashboard
+  labels:
+    app.kubernetes.io/name: store-provisioning-dashboard
+    app.kubernetes.io/part-of: store-platform
+spec:
+  replicas: {{ .Values.dashboard.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: store-provisioning-dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: store-provisioning-dashboard
+        app.kubernetes.io/part-of: store-platform
+    spec:
+      securityContext:
+        runAsNonRoot: false
+      containers:
+        - name: dashboard
+          image: {{ .Values.dashboard.image }}
+          imagePullPolicy: {{ .Values.dashboard.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.dashboard.port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: {{ .Values.dashboard.resources.requests.cpu }}
+              memory: {{ .Values.dashboard.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.dashboard.resources.limits.cpu }}
+              memory: {{ .Values.dashboard.resources.limits.memory }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.dashboard.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.dashboard.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+# --- Dashboard Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-provisioning-dashboard
+  labels:
+    app.kubernetes.io/name: store-provisioning-dashboard
+spec:
+  selector:
+    app.kubernetes.io/name: store-provisioning-dashboard
+  ports:
+    - port: {{ .Values.dashboard.port }}
+      targetPort: {{ .Values.dashboard.port }}
+      protocol: TCP
+---
+# --- Ingress ---
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: store-platform
+  labels:
+    app.kubernetes.io/name: store-platform
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: store-provisioning-api
+                port:
+                  number: {{ .Values.api.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: store-provisioning-dashboard
+                port:
+                  number: {{ .Values.dashboard.port }}
+{{- end }}

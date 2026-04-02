@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.storeName }}-redis
+  labels:
+    app: {{ .Values.storeName }}-redis
+    store-id: {{ .Values.storeId }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.storeName }}-redis
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.storeName }}-redis
+        store-id: {{ .Values.storeId }}
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: {{ .Values.redis.resources.requests.cpu }}
+              memory: {{ .Values.redis.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.redis.resources.limits.cpu }}
+              memory: {{ .Values.redis.resources.limits.memory }}
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.storeName }}-redis
+  labels:
+    app: {{ .Values.storeName }}-redis
+spec:
+  selector:
+    app: {{ .Values.storeName }}-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
