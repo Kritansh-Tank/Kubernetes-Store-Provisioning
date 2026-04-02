@@ -369,6 +369,6 @@ The Medusa chart is architecturally complete (PostgreSQL, Redis, Medusa deployme
 2. Add a seed Job similar to `woo-setup-job.yaml` for Medusa admin user + sample products
 3. Test end-to-end order flow via Medusa storefront
 
-## 📜 License
+## License
 
 Apache-2.0 license - See LICENSE file for details
